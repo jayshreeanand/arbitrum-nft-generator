@@ -4,7 +4,6 @@ extern crate alloc;
 use stylus_sdk::{
     alloy_primitives::{Address, FixedBytes, U256, Uint},
     prelude::*,
-    block,
 };
 use stylus_sdk::alloy_sol_types::sol;
 use std::fmt;
@@ -47,26 +46,27 @@ impl Contract {
         self.owner.set(to);
         self.token_counter.set(self.token_counter.get() + Uint::<32, 1>::from(1u32));
         
-        let vm = stylus_sdk::vm::current();
+        // Get block number and convert to bytes32
+        let block_num = self.vm().block_number();
+        let mut pseudo_hash = [0u8; 32];
+        pseudo_hash[24..32].copy_from_slice(&block_num.to_be_bytes());
+        let pseudo_hash = FixedBytes::<32>::from(pseudo_hash);
         
-        // Emit events using the non-deprecated log function
-        log(&vm, Transfer {
+        // Emit events
+        log(self.vm(), Transfer {
             from: Address::ZERO,
             to,
             tokenId: token_id,
         });
         
-        // Create a pseudo-random hash using block number
-        let block_num = block::number();
-        let pseudo_hash = FixedBytes::from(block_num.to_be_bytes());
-        
-        log(&vm, NFTMinted {
+        log(self.vm(), NFTMinted {
             tokenId: token_id,
             txHash: pseudo_hash,
         });
 
         token_id
     }
+
 
 
     pub fn symbol(&self) -> String {
@@ -101,9 +101,11 @@ impl Contract {
     #[selector(name = "tokenURI")]
     pub fn token_uri(&self, token_id: U256) -> String {
         // Get block number for randomization
-        let block_num = block::number();
-        let tx_hash = FixedBytes::from(block_num.to_be_bytes());
-        let tx_hash_bytes = tx_hash.as_bytes();
+        let block_num = self.vm().block_number();
+        let mut pseudo_hash = [0u8; 32];
+        pseudo_hash[24..32].copy_from_slice(&block_num.to_be_bytes());
+        let tx_hash = FixedBytes::<32>::from(pseudo_hash);
+        let tx_hash_bytes = tx_hash.as_slice();
         
         struct BufferWriter {
             buf: &'static mut [u8],
