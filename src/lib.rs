@@ -99,13 +99,24 @@ impl Contract {
     pub fn token_uri(&self, token_id: U256) -> String {
         // Create a seed array from token ID
         let mut seed = [0u8; 32];
-        let token_num = token_id.to_string();
         
-        // Fill seed with pseudo-random values based on token ID
+        // Convert token_id to bytes and use them directly
+        let token_bytes: [u8; 32] = token_id.to_be_bytes();
+        
+        // Create a more varied seed using token_id bytes
         for i in 0..32 {
-            seed[i] = ((i + 1) * 
-                      (token_num.len() + i + 1) * 
-                      ((i * 7 + 13) % 256)) as u8;
+            // Mix the token bytes with different prime numbers to create variation
+            seed[i] = (
+                (token_bytes[i] as u16 * 167 +  // Use prime numbers
+                (i as u16 * 191) +              // Different prime for position
+                ((i * 7 + 13) % 256) as u16     // Additional variation
+                ) % 256
+            ) as u8;
+        }
+
+        // Additional mixing pass to increase randomness
+        for i in 0..31 {
+            seed[i] ^= seed[i + 1];
         }
 
         struct BufferWriter {
@@ -147,10 +158,10 @@ impl Contract {
             let bg_color = Self::get_random_color(&seed, 31);
             let _ = write!(
                 svg_writer,
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><rect width=\"100%\" height=\"100%\" fill=\"{}\"/>",
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><rect width=\"100%\" height=\"100%\" fill=\"{bg}\"/>",
                 w = width,
                 h = height,
-                bg_color
+                bg = bg_color
             );
 
             // Generate shapes in a grid
@@ -200,21 +211,28 @@ impl Contract {
 
 impl Contract {
     fn get_random_color(seed: &[u8], index: usize) -> String {
-        let base = (index * 7 + 13) % seed.len();
+        let base = (index * 17 + 13) % seed.len();  // Use prime numbers for better distribution
         
-        // Generate vibrant colors by ensuring at least one component is high
-        let r = ((seed[base] as u16 * 7 + seed[(base + 1) % seed.len()] as u16 * 3) % 256) as u8;
-        let g = ((seed[(base + 2) % seed.len()] as u16 * 5 + seed[(base + 3) % seed.len()] as u16 * 2) % 256) as u8;
-        let b = ((seed[(base + 4) % seed.len()] as u16 * 3 + seed[(base + 5) % seed.len()] as u16 * 4) % 256) as u8;
+        // Generate base color components
+        let r = ((seed[base] as u16 * 7 + seed[(base + 1) % seed.len()] as u16 * 13) % 256) as u8;
+        let g = ((seed[(base + 2) % seed.len()] as u16 * 11 + seed[(base + 3) % seed.len()] as u16 * 17) % 256) as u8;
+        let b = ((seed[(base + 4) % seed.len()] as u16 * 19 + seed[(base + 5) % seed.len()] as u16 * 23) % 256) as u8;
         
-        // Ensure at least one component is bright
+        // Ensure colors are vibrant by boosting the lowest components
+        let min_val = 60; // Minimum color component value
+        let r = r.max(min_val);
+        let g = g.max(min_val);
+        let b = b.max(min_val);
+        
+        // Ensure at least one component is very bright
         let max_component = r.max(g).max(b);
-        if max_component < 150 {
-            let scale = 200;
-            let r = ((r as u16 * scale) / max_component as u16).min(255) as u8;
-            let g = ((g as u16 * scale) / max_component as u16).min(255) as u8;
-            let b = ((b as u16 * scale) / max_component as u16).min(255) as u8;
-            format!("#{:02x}{:02x}{:02x}", r, g, b)
+        if max_component < 180 {
+            let brightest = index % 3;
+            match brightest {
+                0 => format!("#{:02x}{:02x}{:02x}", 255, g, b),
+                1 => format!("#{:02x}{:02x}{:02x}", r, 255, b),
+                _ => format!("#{:02x}{:02x}{:02x}", r, g, 255),
+            }
         } else {
             format!("#{:02x}{:02x}{:02x}", r, g, b)
         }
@@ -222,17 +240,18 @@ impl Contract {
 
     fn get_random_shape(seed: &[u8], index: usize, x: usize, y: usize, size: usize) -> String {
         let base = index % seed.len();
-        let shape_type = (seed[base] % 5) as usize;  // Now 5 different shapes
+        // Use more bits from the seed for shape selection
+        let shape_type = ((seed[base] as u16 * seed[(base + 7) % seed.len()] as u16) % 5) as usize;
         let size_half = size / 2;
         
-        // Get multiple colors for potential gradients
-        let color1 = Self::get_random_color(seed, index * 3);
-        let color2 = Self::get_random_color(seed, index * 3 + 1);
-        let color3 = Self::get_random_color(seed, index * 3 + 2);
+        // Get multiple colors with different indices for more variation
+        let color1 = Self::get_random_color(seed, index * 5 + 1);
+        let color2 = Self::get_random_color(seed, index * 7 + 3);
         
-        // Get rotation for variety
-        let rotation = (seed[(base + 3) % seed.len()] as u32 * 
-                       seed[(base + 7) % seed.len()] as u32) % 360;
+        // More varied rotation
+        let rotation = ((seed[(base + 3) % seed.len()] as u32 * 
+                        seed[(base + 7) % seed.len()] as u32 +
+                        seed[(base + 11) % seed.len()] as u32) % 360) as u32;
         
         match shape_type {
             0 => {
