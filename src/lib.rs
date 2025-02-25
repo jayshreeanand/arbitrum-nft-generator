@@ -1,4 +1,3 @@
-// Allow `cargo stylus export-abi` to generate a main function.
 #![cfg_attr(not(any(test, feature = "export-abi")), no_main)]
 extern crate alloc;
 
@@ -6,7 +5,7 @@ use stylus_sdk::{
     alloy_primitives::{Address, FixedBytes, U256},
     prelude::*,
 };
-use stylus_sdk::{alloy_sol_types::sol, evm};
+use stylus_sdk::{alloy_sol_types::sol, msg};
 use std::fmt;
 use std::fmt::Write;
 use stylus_sdk::storage::{StorageAddress, StorageU32};
@@ -26,7 +25,7 @@ pub struct Contract {
 #[public]
 impl Contract {
     pub fn constructor(&mut self) {
-        self.token_counter.set_value(0);
+        self.token_counter.write(0);
     }
 
     pub fn supports_interface(&self, interface: FixedBytes<4>) -> bool {
@@ -39,20 +38,20 @@ impl Contract {
     }
 
     pub fn mint(&mut self, to: Address) -> U256 {
-        let token_id = U256::from(self.token_counter.get_value());
-        self.owner.set_value(to);
-        self.token_counter.set_value(self.token_counter.get_value() + 1);
+        let token_id = U256::from(self.token_counter.read());
+        self.owner.write(to);
+        self.token_counter.write(self.token_counter.read() + 1);
         
         // Emit events
-        evm::log(Transfer {
+        log(Transfer {
             from: Address::ZERO,
             to,
             tokenId: token_id,
         });
         
-        evm::log(NFTMinted {
+        log(NFTMinted {
             tokenId: token_id,
-            txHash: evm::tx_context().tx_hash,
+            txHash: msg::tx_context().hash,
         });
 
         token_id
@@ -67,7 +66,7 @@ impl Contract {
     }
 
     pub fn balance_of(&self, owner: Address) -> U256 {
-        if owner == self.owner.get_value() {
+        if owner == self.owner.read() {
             U256::from(1)
         } else {
             U256::from(0)
@@ -75,11 +74,11 @@ impl Contract {
     }
 
     pub fn owner_of(&self, token_id: U256) -> Result<Address, Vec<u8>> {
-        if token_id >= U256::from(self.token_counter.get_value()) {
+        if token_id >= U256::from(self.token_counter.read()) {
             return Err("Token does not exist".as_bytes().to_vec());
         }
 
-        let owner = self.owner.get_value();
+        let owner = self.owner.read();
         if owner == Address::ZERO {
             return Err("Token not minted".as_bytes().to_vec());
         }
@@ -93,7 +92,7 @@ impl Contract {
         static mut JSON_BUFFER: [u8; 12288] = [0; 12288];
 
         // Get transaction details for randomization
-        let tx_hash = evm::tx_context().tx_hash;
+        let tx_hash = msg::tx_context().hash;
         let tx_hash_bytes = tx_hash.as_bytes();
 
         struct BufferWriter {
@@ -151,7 +150,7 @@ impl Contract {
                         i * grid_size + j,
                         x,
                         y,
-                        cell_size as u32
+                        cell_size
                     );
                     let _ = write!(svg_writer, "{}", shape);
                 }
@@ -211,22 +210,23 @@ impl Contract {
         )
     }
 
-    fn get_random_shape(seed: &[u8], index: usize, x: usize, y: usize, size: u32) -> String {
+    fn get_random_shape(seed: &[u8], index: usize, x: usize, y: usize, size: usize) -> String {
         let shape_type = seed[index % seed.len()] % 3;
+        let size_third = size / 3;
         match shape_type {
             0 => format!(
                 "<circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{}\" opacity=\"0.7\"/>",
-                x, y, size/3, Self::get_random_color(seed, index + 1)
+                x, y, size_third, Self::get_random_color(seed, index + 1)
             ),
             1 => format!(
                 "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\" opacity=\"0.7\"/>",
-                x - size/3, y - size/3, size/2, size/2, Self::get_random_color(seed, index + 2)
+                x - size_third, y - size_third, size/2, size/2, Self::get_random_color(seed, index + 2)
             ),
             _ => format!(
                 "<polygon points=\"{},{} {},{} {},{}\" fill=\"{}\" opacity=\"0.7\"/>",
-                x, y - size/3,
-                x - size/3, y + size/3,
-                x + size/3, y + size/3,
+                x, y - size_third,
+                x - size_third, y + size_third,
+                x + size_third, y + size_third,
                 Self::get_random_color(seed, index + 3)
             ),
         }
