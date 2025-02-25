@@ -1,0 +1,28 @@
+{
+  "name": "arbitrum-agent",
+  "version": "1.0.0",
+  "description": "![Image](./header.png)",
+  "main": "fractal.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jayshreeanand/arbitrum-agent.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jayshreeanand/arbitrum-agent/issues"
+  },
+  "homepage": "https://github.com/jayshreeanand/arbitrum-agent#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "http-proxy-middleware": "^3.0.3"
+  }
+}
