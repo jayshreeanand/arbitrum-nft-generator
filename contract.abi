@@ -1,143 +1,146 @@
-{
-  "constructor": {
+[
+  {
     "inputs": [],
     "stateMutability": "payable",
     "type": "constructor"
   },
-  "events": {
-    "NFTMinted": {
-      "inputs": [
-        {
-          "indexed": true,
-          "name": "tokenId",
-          "type": "uint256"
-        },
-        {
-          "indexed": true,
-          "name": "txHash",
-          "type": "bytes32"
-        }
-      ],
-      "name": "NFTMinted",
-      "type": "event"
-    },
-    "Transfer": {
-      "inputs": [
-        {
-          "indexed": true,
-          "name": "from",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "name": "Transfer",
-      "type": "event"
-    }
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "name": "txHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "NFTMinted",
+    "type": "event"
   },
-  "functions": {
-    "balanceOf": {
-      "inputs": [
-        {
-          "name": "owner",
-          "type": "address"
-        }
-      ],
-      "outputs": [
-        {
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    "mint": {
-      "inputs": [
-        {
-          "name": "to",
-          "type": "address"
-        }
-      ],
-      "outputs": [
-        {
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    "name": {
-      "inputs": [],
-      "outputs": [
-        {
-          "type": "string"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    "ownerOf": {
-      "inputs": [
-        {
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "outputs": [
-        {
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    "supportsInterface": {
-      "inputs": [
-        {
-          "name": "interface",
-          "type": "bytes4"
-        }
-      ],
-      "outputs": [
-        {
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    "symbol": {
-      "inputs": [],
-      "outputs": [
-        {
-          "type": "string"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    "tokenURI": {
-      "inputs": [
-        {
-          "name": "tokenId",
-          "type": "uint256"
-        }
-      ],
-      "outputs": [
-        {
-          "type": "string"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    }
+  {
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "Transfer",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "name": "balanceOf",
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "to",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "name": "mint",
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "outputs": [
+      {
+        "type": "string"
+      }
+    ],
+    "name": "name",
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "address"
+      }
+    ],
+    "name": "ownerOf",
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "interface",
+        "type": "bytes4"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "bool"
+      }
+    ],
+    "name": "supportsInterface",
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "outputs": [
+      {
+        "type": "string"
+      }
+    ],
+    "name": "symbol",
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "string"
+      }
+    ],
+    "name": "tokenURI",
+    "stateMutability": "view",
+    "type": "function"
   }
-}
+]
