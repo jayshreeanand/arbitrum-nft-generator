@@ -35,6 +35,57 @@ This project demonstrates the power of Stylus by implementing a fully on-chain N
 - Connecting lines with opacity effects
 - White background for better visibility
 
+## Visual Elements
+
+### Grid System
+
+- 6x6 grid layout
+- Each cell contains one shape
+- Shapes can overlap edges
+
+### Shapes
+
+- Circles: Varying sizes and positions
+- Rectangles: Different rotations and dimensions
+- Triangles: Multiple orientations
+- Lines: Connecting random points
+
+### Colors
+
+- Full RGB spectrum
+- Opacity variations
+- Color harmony through seed-based generation
+
+### Depth
+
+- Layered elements
+- Opacity-based depth
+- Overlapping shapes
+
+## Technical Details
+
+### Storage
+
+- SVG data stored on-chain
+- Minimal storage requirements
+- No external dependencies
+
+### Generation
+
+- Deterministic based on token ID
+- Block hash for additional randomness
+- Gas-efficient calculations
+
+### Viewing
+
+- Real-time generation
+- No external rendering required
+- Standard SVG format
+
+## Usage
+
+1. Connect
+
 ## Getting Started
 
 ### Prerequisites
