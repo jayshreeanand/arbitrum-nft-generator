@@ -116,10 +116,10 @@ impl Contract {
         }
 
         impl Write for BufferWriter {
-            fn write_str(&mut self, s: &str) -> fmt::Result {  // Fixed fmt::Result
+            fn write_str(&mut self, s: &str) -> fmt::Result {
                 let bytes = s.as_bytes();
                 if self.pos + bytes.len() > self.buf.len() {
-                    return Err(fmt::Error);  // Fixed fmt::Error
+                    return Err(fmt::Error);
                 }
                 for &b in bytes {
                     self.buf[self.pos] = b;
@@ -139,41 +139,13 @@ impl Contract {
             let grid_size = 6;
             let cell_size = width / grid_size;
 
-            // Write SVG header with definitions for gradients
+            // Write simple SVG header
             let _ = write!(
                 svg_writer,
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><defs>",
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><rect width=\"100%\" height=\"100%\" fill=\"#f0f0f0\"/>",
                 w = width,
                 h = height
             );
-
-            // Generate some random gradients that can be reused
-            for i in 0..5 {
-                let grad_id = format!("grad{}", i);
-                let color1 = Self::get_random_color(tx_hash_bytes, i * 3);
-                let color2 = Self::get_random_color(tx_hash_bytes, i * 3 + 1);
-                let _ = write!(
-                    svg_writer,
-                    "<linearGradient id=\"{}\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" style=\"stop-color:{}\"/><stop offset=\"100%\" style=\"stop-color:{}\"/></linearGradient>",
-                    grad_id, color1, color2
-                );
-            }
-            
-            let _ = write!(svg_writer, "</defs><rect width=\"100%\" height=\"100%\" fill=\"#f0f0f0\"/>");
-
-            // Generate background patterns
-            for i in 0..8 {
-                let x = tx_hash_bytes[i * 2] as usize % width;
-                let y = tx_hash_bytes[i * 2 + 1] as usize % height;
-                let size = 50 + (tx_hash_bytes[i] as usize % 200);
-                let color = Self::get_random_color(tx_hash_bytes, i + 100);
-                let opacity = 10 + (tx_hash_bytes[i] as usize % 20);
-                let _ = write!(
-                    svg_writer,
-                    "<circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{}\" opacity=\"0.{}\"/>",
-                    x, y, size, color, opacity
-                );
-            }
 
             // Generate shapes in a grid
             for i in 0..grid_size {
@@ -205,9 +177,8 @@ impl Contract {
 
             let _ = write!(
                 json_writer,
-                "{{\"name\":\"Random Art #{}\",\"description\":\"A unique piece of generative art created from block {}\",\"image\":\"{}\"}}",
+                "{{\"name\":\"Random Art #{}\",\"description\":\"A unique piece of generative art\",\"image\":\"{}\"}}",
                 token_id,
-                block_num,
                 svg_uri
             );
 
@@ -223,113 +194,57 @@ impl Contract {
 
 impl Contract {
     fn get_random_color(seed: &[u8], index: usize) -> String {
-        // Use different combinations of the seed bytes for more variation
         let r = seed[(index * 3) % seed.len()];
         let g = seed[(index * 5 + 1) % seed.len()];
         let b = seed[(index * 7 + 2) % seed.len()];
-        
-        // Ensure colors are vibrant by adding minimum values
-        let r = ((r as u16 * 7 + 85) % 256) as u8;
-        let g = ((g as u16 * 5 + 85) % 256) as u8;
-        let b = ((b as u16 * 3 + 85) % 256) as u8;
-        
         format!("#{:02x}{:02x}{:02x}", r, g, b)
     }
 
     fn get_random_shape(seed: &[u8], index: usize, x: usize, y: usize, size: usize) -> String {
-        let shape_seed = (seed[index % seed.len()] as u16 * 
-                         seed[(index + 7) % seed.len()] as u16) % 256;
-        let shape_type = shape_seed % 6;
-        
+        let shape_type = seed[index % seed.len()] % 4;
         let size_half = size / 2;
-        let grad_index = index % 5;
-        let use_gradient = seed[index] % 2 == 0;
-        let fill = if use_gradient {
-            format!("url(#grad{})", grad_index)
-        } else {
-            Self::get_random_color(seed, index)
-        };
-        
-        let rotation = ((seed[(index * 3) % seed.len()] as u32 * 
-                        seed[(index + 11) % seed.len()] as u32) % 360) as u32;
+        let color = Self::get_random_color(seed, index);
         
         match shape_type {
             0 => {
-                // Circle with potential gradient
-                let radius = size_half * 
-                    (50 + (seed[(index * 2) % seed.len()] as usize % 50)) / 100;
+                // Circle
                 format!(
-                    "<circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{}\" opacity=\"0.8\"/>",
-                    x, y, radius, fill
+                    "<circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{}\"/>",
+                    x, y, size_half, color
                 )
             },
             1 => {
-                // Rectangle with rounded corners
-                let width = size * 
-                    (50 + (seed[(index * 4) % seed.len()] as usize % 50)) / 100;
-                let height = size * 
-                    (50 + (seed[(index * 5) % seed.len()] as usize % 50)) / 100;
-                let rx = width / 10;
+                // Square
                 format!(
-                    "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"{}\" fill=\"{}\" opacity=\"0.8\" transform=\"rotate({} {} {})\"/>",
-                    x - width/2, y - height/2, width, height, rx, fill, rotation, x, y
+                    "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\"/>",
+                    x - size_half, y - size_half, size, size, color
                 )
             },
             2 => {
-                // Diamond
-                let points = format!(
-                    "{},{} {},{} {},{} {},{}",
-                    x, y - size_half,           // top
-                    x + size_half, y,           // right
-                    x, y + size_half,           // bottom
-                    x - size_half, y            // left
-                );
-                format!(
-                    "<polygon points=\"{}\" fill=\"{}\" opacity=\"0.8\" transform=\"rotate({} {} {})\"/>",
-                    points, fill, rotation, x, y
-                )
-            },
-            3 => {
                 // Triangle
-                let height = size * 
-                    (60 + (seed[(index * 6) % seed.len()] as usize % 40)) / 100;
-                let base = size * 
-                    (60 + (seed[(index * 8) % seed.len()] as usize % 40)) / 100;
                 let points = format!(
                     "{},{} {},{} {},{}",
-                    x, y - height/2,
-                    x - base/2, y + height/2,
-                    x + base/2, y + height/2
+                    x, y - size_half,
+                    x - size_half, y + size_half,
+                    x + size_half, y + size_half
                 );
                 format!(
-                    "<polygon points=\"{}\" fill=\"{}\" opacity=\"0.8\" transform=\"rotate({} {} {})\"/>",
-                    points, fill, rotation, x, y
-                )
-            },
-            4 => {
-                // Cross
-                let thickness = size / 4;
-                format!(
-                    "<path d=\"M {} {} h {} v {} h {} v {} h -{} v {} h -{} v -{} h -{} v -{}\" fill=\"{}\" opacity=\"0.8\" transform=\"rotate({} {} {})\"/>",
-                    x - thickness/2, y - size_half,
-                    thickness, size/3,
-                    thickness, thickness,
-                    thickness, size/3,
-                    thickness, thickness,
-                    thickness, size/3,
-                    fill, rotation, x, y
+                    "<polygon points=\"{}\" fill=\"{}\"/>",
+                    points, color
                 )
             },
             _ => {
-                // Plus sign
-                let length = size * 
-                    (50 + (seed[(index * 9) % seed.len()] as usize % 50)) / 100;
-                let stroke_width = (seed[(index * 13) % seed.len()] % 8 + 2) as usize;
+                // Diamond
+                let points = format!(
+                    "{},{} {},{} {},{} {},{}",
+                    x, y - size_half,
+                    x + size_half, y,
+                    x, y + size_half,
+                    x - size_half, y
+                );
                 format!(
-                    "<g transform=\"rotate({} {} {})\"><line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"{}\" stroke-width=\"{}\"/><line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"{}\" stroke-width=\"{}\"/></g>",
-                    rotation, x, y,
-                    x - length/2, y, x + length/2, y, fill, stroke_width,
-                    x, y - length/2, x, y + length/2, fill, stroke_width
+                    "<polygon points=\"{}\" fill=\"{}\"/>",
+                    points, color
                 )
             }
         }
