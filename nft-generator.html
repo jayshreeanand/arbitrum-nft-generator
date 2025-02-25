@@ -8,6 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="fractal.js"></script>
 </head>
 <body>
     <div id="root"></div>
@@ -176,8 +177,91 @@
             ]);
         };
 
+        // FRACTAL GENERATOR
+
+                // create fractal object, send it an HTML canvas element
+        // on which it will draw itself
+        var fractal = new Fractal(fractalCanvasElement);
+
+        // tell the fractal to update itself based on the options sent
+        // it will only redraw itself if necessary
+        fractal.update(options);
+        // fractal api as an options object
+// all keys are optional
+var options = {
+
+// set size of canvas
+// set pixel width of canvas
+pxWidth: number, // e.g. 2880
+
+// set pixel height of canvas
+pxHeight: number, // e.g. 1800
+
+
+// reset to default settings (coordinates, max escape time, and
+// starting options - does not reset canvas size)
+defaults: true,
+
+// reset to default cartesian coordinates (shows the whole fractal)
+resetToDefaultCords: true,
+
+// draw the fractal at these specific cartesian coordinates
+cords: {  
+  xCartMin: number, // e.g. -2.1
+  xCartMax: number, // e.g. 0.8,
+  yCartMin: number, // e.g. -1.2,
+  yCartMax: number // e.g. 1.2
+},
+
+// set the maximum escape time
+// numbers < 14 will be converted to 14
+// numbers > 1792 will be converted to 1792
+maxEscapeTime: number, // e.g. 224
+
+// pixel coordinates on canvas of point to zoom in on
+zoomInPxPoint: {
+  xPx: number, // e.g. 100
+  yPx: number // e.g. 100
+},
+
+// pixel coordinates on canvas of point to zoom out from
+zoomOutPxPoint: {
+  xPx: number, // e.g. 100
+  yPx: number // e.g. 100
+},
+
+// pixel coordinates of rectangle on canvas to zoom in on
+zoomInPxBox: {
+  xPxMin: number, // e.g. 50
+  xPxMax: number, // e.g. 100
+  yPxMin: number, // e.g. 50
+  yPxMax: number // e.g. 100
+},
+
+// set the current options as the starting options
+// the fractal resets to its starting options when told to reset
+setAsStartingOptions: bool, // e.g. true
+
+// reset cartesian coordinates to starting cartesian coordinates
+resetCords: bool, // e.g. true
+
+// reset the max escape time to the starting max escape time
+resetMaxEscapeTime: bool, // e.g. true
+
+// draw with distortion if the ratio of canvas width/height doesn't
+// match the ratio of cartesian coordinates width/height
+// by default (if this is omitted or false) the cartesian coordinates are
+// adjusted to match the ratio of the canvas width/height to avoid distortion
+distortion: bool // e.g. true
+
+}
+
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(React.createElement(NFTViewer));
+
+
+
     </script>
 </body>
 </html>
