@@ -67,8 +67,6 @@ impl Contract {
         token_id
     }
 
-
-
     pub fn symbol(&self) -> String {
         "RNFT".to_string()
     }
