@@ -2,10 +2,11 @@
 extern crate alloc;
 
 use stylus_sdk::{
-    alloy_primitives::{Address, FixedBytes, U256},
+    alloy_primitives::{Address, FixedBytes, U256, Uint},
     prelude::*,
+    msg,
 };
-use stylus_sdk::{alloy_sol_types::sol, msg};
+use stylus_sdk::{alloy_sol_types::sol, block};
 use std::fmt;
 use std::fmt::Write;
 use stylus_sdk::storage::{StorageAddress, StorageU32};
@@ -25,7 +26,7 @@ pub struct Contract {
 #[public]
 impl Contract {
     pub fn constructor(&mut self) {
-        self.token_counter.write(0);
+        self.token_counter.set(Uint::<32, 1>::from(0u32));
     }
 
     pub fn supports_interface(&self, interface: FixedBytes<4>) -> bool {
@@ -38,20 +39,20 @@ impl Contract {
     }
 
     pub fn mint(&mut self, to: Address) -> U256 {
-        let token_id = U256::from(self.token_counter.read());
-        self.owner.write(to);
-        self.token_counter.write(self.token_counter.read() + 1);
+        let token_id = U256::from(self.token_counter.get());
+        self.owner.set(to);
+        self.token_counter.set(self.token_counter.get() + Uint::<32, 1>::from(1u32));
         
         // Emit events
-        log(Transfer {
+        msg::log(Transfer {
             from: Address::ZERO,
             to,
             tokenId: token_id,
         });
         
-        log(NFTMinted {
+        msg::log(NFTMinted {
             tokenId: token_id,
-            txHash: msg::tx_context().hash,
+            txHash: msg::tx_hash(),
         });
 
         token_id
@@ -66,7 +67,7 @@ impl Contract {
     }
 
     pub fn balance_of(&self, owner: Address) -> U256 {
-        if owner == self.owner.read() {
+        if owner == self.owner.get() {
             U256::from(1)
         } else {
             U256::from(0)
@@ -74,11 +75,11 @@ impl Contract {
     }
 
     pub fn owner_of(&self, token_id: U256) -> Result<Address, Vec<u8>> {
-        if token_id >= U256::from(self.token_counter.read()) {
+        if token_id >= U256::from(self.token_counter.get()) {
             return Err("Token does not exist".as_bytes().to_vec());
         }
 
-        let owner = self.owner.read();
+        let owner = self.owner.get();
         if owner == Address::ZERO {
             return Err("Token not minted".as_bytes().to_vec());
         }
@@ -88,12 +89,12 @@ impl Contract {
 
     #[selector(name = "tokenURI")]
     pub fn token_uri(&self, token_id: U256) -> String {
-        static mut SVG_BUFFER: [u8; 8192] = [0; 8192];
-        static mut JSON_BUFFER: [u8; 12288] = [0; 12288];
-
+        // ... existing code ...
         // Get transaction details for randomization
-        let tx_hash = msg::tx_context().hash;
+        let tx_hash = msg::tx_hash();
         let tx_hash_bytes = tx_hash.as_bytes();
+
+       
 
         struct BufferWriter {
             buf: &'static mut [u8],
