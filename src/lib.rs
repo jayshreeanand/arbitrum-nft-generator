@@ -4,7 +4,7 @@ extern crate alloc;
 use stylus_sdk::{
     alloy_primitives::{Address, FixedBytes, U256, Uint},
     prelude::*,
-    evm,
+    block,
 };
 use stylus_sdk::alloy_sol_types::sol;
 use std::fmt;
@@ -47,20 +47,27 @@ impl Contract {
         self.owner.set(to);
         self.token_counter.set(self.token_counter.get() + Uint::<32, 1>::from(1u32));
         
-        // Emit events
-        evm::log(Transfer {
+        let vm = stylus_sdk::vm::current();
+        
+        // Emit events using the non-deprecated log function
+        log(&vm, Transfer {
             from: Address::ZERO,
             to,
             tokenId: token_id,
         });
         
-        evm::log(NFTMinted {
+        // Create a pseudo-random hash using block number
+        let block_num = block::number();
+        let pseudo_hash = FixedBytes::from(block_num.to_be_bytes());
+        
+        log(&vm, NFTMinted {
             tokenId: token_id,
-            txHash: evm::tx_hash(),
+            txHash: pseudo_hash,
         });
 
         token_id
     }
+
 
     pub fn symbol(&self) -> String {
         "RNFT".to_string()
@@ -93,10 +100,11 @@ impl Contract {
 
     #[selector(name = "tokenURI")]
     pub fn token_uri(&self, token_id: U256) -> String {
-        // Get transaction details for randomization
-        let tx_hash = evm::tx_hash();
+        // Get block number for randomization
+        let block_num = block::number();
+        let tx_hash = FixedBytes::from(block_num.to_be_bytes());
         let tx_hash_bytes = tx_hash.as_bytes();
-
+        
         struct BufferWriter {
             buf: &'static mut [u8],
             pos: usize,
