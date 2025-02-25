@@ -25,6 +25,52 @@ pub struct Contract {
     token_counter: StorageU32,
 }
 
+// Move structs and their implementations to the top level
+struct Rng {
+    state: u64,
+}
+
+impl Rng {
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+
+    fn next(&mut self) -> u64 {
+        self.state = self.state.wrapping_mul(0x2545F4914F6CDD1D);
+        self.state = self.state ^ (self.state >> 32);
+        self.state
+    }
+
+    fn next_range(&mut self, min: usize, max: usize) -> usize {
+        min + (self.next() as usize % (max - min + 1))
+    }
+}
+
+struct BufferWriter {
+    buf: &'static mut [u8],
+    pos: usize,
+}
+
+impl BufferWriter {
+    fn new(buf: &'static mut [u8]) -> Self {
+        Self { buf, pos: 0 }
+    }
+}
+
+impl Write for BufferWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let bytes = s.as_bytes();
+        if self.pos + bytes.len() > self.buf.len() {
+            return Err(fmt::Error);
+        }
+        for &b in bytes {
+            self.buf[self.pos] = b;
+            self.pos += 1;
+        }
+        Ok(())
+    }
+}
+
 #[public]
 impl Contract {
     #[payable]
@@ -97,52 +143,10 @@ impl Contract {
 
     #[selector(name = "tokenURI")]
     pub fn token_uri(&self, token_id: U256) -> String {
-        // Create a seed array from token ID
-        let mut seed = [0u8; 32];
-        
-        // Convert token_id to bytes and use them directly
-        let token_bytes: [u8; 32] = token_id.to_be_bytes();
-        
-        // Create a more varied seed using token_id bytes
-        for i in 0..32 {
-            // Mix the token bytes with different prime numbers to create variation
-            seed[i] = (
-                (token_bytes[i] as u16 * 167 +  // Use prime numbers
-                (i as u16 * 191) +              // Different prime for position
-                ((i * 7 + 13) % 256) as u16     // Additional variation
-                ) % 256
-            ) as u8;
-        }
-
-        // Additional mixing pass to increase randomness
-        for i in 0..31 {
-            seed[i] ^= seed[i + 1];
-        }
-
-        struct BufferWriter {
-            buf: &'static mut [u8],
-            pos: usize,
-        }
-
-        impl BufferWriter {
-            fn new(buf: &'static mut [u8]) -> Self {
-                Self { buf, pos: 0 }
-            }
-        }
-
-        impl Write for BufferWriter {
-            fn write_str(&mut self, s: &str) -> fmt::Result {
-                let bytes = s.as_bytes();
-                if self.pos + bytes.len() > self.buf.len() {
-                    return Err(fmt::Error);
-                }
-                for &b in bytes {
-                    self.buf[self.pos] = b;
-                    self.pos += 1;
-                }
-                Ok(())
-            }
-        }
+        // Initialize RNG with token_id and current timestamp
+        let token_num = token_id.to_string().parse::<u64>().unwrap_or(1);
+        let timestamp = self.vm().block_timestamp() as u64;
+        let mut rng = Rng::new(token_num.wrapping_mul(timestamp));
 
         unsafe {
             let svg_buf = &mut SVG_BUFFER;
@@ -154,8 +158,10 @@ impl Contract {
             let grid_size = 6;
             let cell_size = width / grid_size;
 
-            // Write SVG header with a random background color
-            let bg_color = Self::get_random_color(&seed, 31);
+            // Generate vibrant background color
+            let bg_color = Self::get_random_color(&mut rng);
+
+            // Write SVG header
             let _ = write!(
                 svg_writer,
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><rect width=\"100%\" height=\"100%\" fill=\"{bg}\"/>",
@@ -170,13 +176,7 @@ impl Contract {
                     let x = (j * cell_size) + (cell_size / 2);
                     let y = (i * cell_size) + (cell_size / 2);
                     let shape_size = cell_size * 4 / 5;
-                    let shape = Self::get_random_shape(
-                        &seed,
-                        i * grid_size + j,
-                        x,
-                        y,
-                        shape_size
-                    );
+                    let shape = Self::generate_random_shape(&mut rng, x, y, shape_size);
                     let _ = write!(svg_writer, "{}", shape);
                 }
             }
@@ -210,54 +210,28 @@ impl Contract {
 }
 
 impl Contract {
-    fn get_random_color(seed: &[u8], index: usize) -> String {
-        let base = (index * 17 + 13) % seed.len();  // Use prime numbers for better distribution
-        
-        // Generate base color components
-        let r = ((seed[base] as u16 * 7 + seed[(base + 1) % seed.len()] as u16 * 13) % 256) as u8;
-        let g = ((seed[(base + 2) % seed.len()] as u16 * 11 + seed[(base + 3) % seed.len()] as u16 * 17) % 256) as u8;
-        let b = ((seed[(base + 4) % seed.len()] as u16 * 19 + seed[(base + 5) % seed.len()] as u16 * 23) % 256) as u8;
-        
-        // Ensure colors are vibrant by boosting the lowest components
-        let min_val = 60; // Minimum color component value
-        let r = r.max(min_val);
-        let g = g.max(min_val);
-        let b = b.max(min_val);
-        
-        // Ensure at least one component is very bright
-        let max_component = r.max(g).max(b);
-        if max_component < 180 {
-            let brightest = index % 3;
-            match brightest {
-                0 => format!("#{:02x}{:02x}{:02x}", 255, g, b),
-                1 => format!("#{:02x}{:02x}{:02x}", r, 255, b),
-                _ => format!("#{:02x}{:02x}{:02x}", r, g, 255),
-            }
-        } else {
-            format!("#{:02x}{:02x}{:02x}", r, g, b)
-        }
+    fn get_random_color(rng: &mut Rng) -> String {
+        let r = rng.next_range(50, 255) as u8;
+        let g = rng.next_range(50, 255) as u8;
+        let b = rng.next_range(50, 255) as u8;
+        format!("#{:02x}{:02x}{:02x}", r, g, b)
     }
 
-    fn get_random_shape(seed: &[u8], index: usize, x: usize, y: usize, size: usize) -> String {
-        let base = index % seed.len();
-        // Use more bits from the seed for shape selection
-        let shape_type = ((seed[base] as u16 * seed[(base + 7) % seed.len()] as u16) % 5) as usize;
+    fn generate_random_shape(rng: &mut Rng, x: usize, y: usize, size: usize) -> String {
+        let shape_type = rng.next_range(0, 6);
         let size_half = size / 2;
         
-        // Get multiple colors with different indices for more variation
-        let color1 = Self::get_random_color(seed, index * 5 + 1);
-        let color2 = Self::get_random_color(seed, index * 7 + 3);
+        // Get random colors
+        let color1 = Self::get_random_color(rng);
+        let color2 = Self::get_random_color(rng);
         
-        // More varied rotation
-        let rotation = ((seed[(base + 3) % seed.len()] as u32 * 
-                        seed[(base + 7) % seed.len()] as u32 +
-                        seed[(base + 11) % seed.len()] as u32) % 360) as u32;
+        // Random rotation
+        let rotation = rng.next_range(0, 360);
         
         match shape_type {
             0 => {
                 // Circle with gradient stroke
-                let radius = size_half * 
-                    (50 + (seed[base] as usize % 50)) / 100;
+                let radius = size_half * rng.next_range(50, 100) / 100;
                 format!(
                     "<circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"4\"/>",
                     x, y, radius, color1, color2
@@ -265,22 +239,22 @@ impl Contract {
             },
             1 => {
                 // Rectangle with gradient
-                let width = size * (50 + (seed[(base + 1) % seed.len()] as usize % 50)) / 100;
-                let height = size * (50 + (seed[(base + 2) % seed.len()] as usize % 50)) / 100;
+                let width = size * rng.next_range(50, 100) / 100;
+                let height = size * rng.next_range(50, 100) / 100;
                 format!(
                     "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"3\" transform=\"rotate({} {} {})\"/>",
                     x - width/2, y - height/2, width, height, color1, color2, rotation, x, y
                 )
             },
             2 => {
-                // Star-like shape
+                // Triangle
+                let height = size * rng.next_range(60, 100) / 100;
+                let base = size * rng.next_range(60, 100) / 100;
                 let points = format!(
-                    "{},{} {},{} {},{} {},{} {},{}",
-                    x, y - size_half,
-                    x + size_half/2, y - size_half/4,
-                    x + size_half, y,
-                    x + size_half/2, y + size_half/2,
-                    x, y + size_half
+                    "{},{} {},{} {},{}",
+                    x, y - height/2,
+                    x - base/2, y + height/2,
+                    x + base/2, y + height/2
                 );
                 format!(
                     "<polygon points=\"{}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"2\" transform=\"rotate({} {} {})\"/>",
@@ -289,23 +263,43 @@ impl Contract {
             },
             3 => {
                 // Cross
+                let thickness = size / rng.next_range(3, 6);
                 format!(
                     "<g transform=\"rotate({} {} {})\"><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\"/><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\"/></g>",
                     rotation, x, y,
-                    x - size/6, y - size_half, size/3, size, color1,
-                    x - size_half, y - size/6, size, size/3, color2
+                    x - thickness/2, y - size_half, thickness, size, color1,
+                    x - size_half, y - thickness/2, size, thickness, color2
                 )
             },
-            _ => {
-                // Diamond with three colors
-                format!(
-                    "<path d=\"M {} {} L {} {} L {} {} L {} {} Z\" fill=\"{}\" stroke=\"{}\" stroke-width=\"3\" transform=\"rotate({} {} {})\"/>",
+            4 => {
+                // Diamond
+                let points = format!(
+                    "{},{} {},{} {},{} {},{}",
                     x, y - size_half,
                     x + size_half, y,
                     x, y + size_half,
-                    x - size_half, y,
-                    color1, color2,
-                    rotation, x, y
+                    x - size_half, y
+                );
+                format!(
+                    "<polygon points=\"{}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"2\" transform=\"rotate({} {} {})\"/>",
+                    points, color1, color2, rotation, x, y
+                )
+            },
+            _ => {
+                // Star
+                let outer = size_half;
+                let inner = size_half * 60 / 100;
+                let points = format!(
+                    "{},{} {},{} {},{} {},{} {},{}",
+                    x, y - outer,
+                    x + inner, y - inner/2,
+                    x + outer, y,
+                    x + inner, y + inner/2,
+                    x, y + outer
+                );
+                format!(
+                    "<polygon points=\"{}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"2\" transform=\"rotate({} {} {})\"/>",
+                    points, color1, color2, rotation, x, y
                 )
             }
         }
