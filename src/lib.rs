@@ -97,13 +97,17 @@ impl Contract {
 
     #[selector(name = "tokenURI")]
     pub fn token_uri(&self, token_id: U256) -> String {
-        // Get block number for randomization
-        let block_num = self.vm().block_number();
-        let mut pseudo_hash = [0u8; 32];
-        pseudo_hash[24..32].copy_from_slice(&block_num.to_be_bytes());
-        let tx_hash = FixedBytes::<32>::from(pseudo_hash);
-        let tx_hash_bytes = tx_hash.as_slice();
+        // Create a seed array from token ID
+        let mut seed = [0u8; 32];
+        let token_num = token_id.to_string();
         
+        // Fill seed with pseudo-random values based on token ID
+        for i in 0..32 {
+            seed[i] = ((i + 1) * 
+                      (token_num.len() + i + 1) * 
+                      ((i * 7 + 13) % 256)) as u8;
+        }
+
         struct BufferWriter {
             buf: &'static mut [u8],
             pos: usize,
@@ -139,12 +143,14 @@ impl Contract {
             let grid_size = 6;
             let cell_size = width / grid_size;
 
-            // Write simple SVG header
+            // Write SVG header with a random background color
+            let bg_color = Self::get_random_color(&seed, 31);
             let _ = write!(
                 svg_writer,
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><rect width=\"100%\" height=\"100%\" fill=\"#f0f0f0\"/>",
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><rect width=\"100%\" height=\"100%\" fill=\"{}\"/>",
                 w = width,
-                h = height
+                h = height,
+                bg_color
             );
 
             // Generate shapes in a grid
@@ -154,7 +160,7 @@ impl Contract {
                     let y = (i * cell_size) + (cell_size / 2);
                     let shape_size = cell_size * 4 / 5;
                     let shape = Self::get_random_shape(
-                        tx_hash_bytes,
+                        &seed,
                         i * grid_size + j,
                         x,
                         y,
@@ -194,57 +200,93 @@ impl Contract {
 
 impl Contract {
     fn get_random_color(seed: &[u8], index: usize) -> String {
-        let r = seed[(index * 3) % seed.len()];
-        let g = seed[(index * 5 + 1) % seed.len()];
-        let b = seed[(index * 7 + 2) % seed.len()];
-        format!("#{:02x}{:02x}{:02x}", r, g, b)
+        let base = (index * 7 + 13) % seed.len();
+        
+        // Generate vibrant colors by ensuring at least one component is high
+        let r = ((seed[base] as u16 * 7 + seed[(base + 1) % seed.len()] as u16 * 3) % 256) as u8;
+        let g = ((seed[(base + 2) % seed.len()] as u16 * 5 + seed[(base + 3) % seed.len()] as u16 * 2) % 256) as u8;
+        let b = ((seed[(base + 4) % seed.len()] as u16 * 3 + seed[(base + 5) % seed.len()] as u16 * 4) % 256) as u8;
+        
+        // Ensure at least one component is bright
+        let max_component = r.max(g).max(b);
+        if max_component < 150 {
+            let scale = 200;
+            let r = ((r as u16 * scale) / max_component as u16).min(255) as u8;
+            let g = ((g as u16 * scale) / max_component as u16).min(255) as u8;
+            let b = ((b as u16 * scale) / max_component as u16).min(255) as u8;
+            format!("#{:02x}{:02x}{:02x}", r, g, b)
+        } else {
+            format!("#{:02x}{:02x}{:02x}", r, g, b)
+        }
     }
 
     fn get_random_shape(seed: &[u8], index: usize, x: usize, y: usize, size: usize) -> String {
-        let shape_type = seed[index % seed.len()] % 4;
+        let base = index % seed.len();
+        let shape_type = (seed[base] % 5) as usize;  // Now 5 different shapes
         let size_half = size / 2;
-        let color = Self::get_random_color(seed, index);
+        
+        // Get multiple colors for potential gradients
+        let color1 = Self::get_random_color(seed, index * 3);
+        let color2 = Self::get_random_color(seed, index * 3 + 1);
+        let color3 = Self::get_random_color(seed, index * 3 + 2);
+        
+        // Get rotation for variety
+        let rotation = (seed[(base + 3) % seed.len()] as u32 * 
+                       seed[(base + 7) % seed.len()] as u32) % 360;
         
         match shape_type {
             0 => {
-                // Circle
+                // Circle with gradient stroke
+                let radius = size_half * 
+                    (50 + (seed[base] as usize % 50)) / 100;
                 format!(
-                    "<circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{}\"/>",
-                    x, y, size_half, color
+                    "<circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"4\"/>",
+                    x, y, radius, color1, color2
                 )
             },
             1 => {
-                // Square
+                // Rectangle with gradient
+                let width = size * (50 + (seed[(base + 1) % seed.len()] as usize % 50)) / 100;
+                let height = size * (50 + (seed[(base + 2) % seed.len()] as usize % 50)) / 100;
                 format!(
-                    "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\"/>",
-                    x - size_half, y - size_half, size, size, color
+                    "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"3\" transform=\"rotate({} {} {})\"/>",
+                    x - width/2, y - height/2, width, height, color1, color2, rotation, x, y
                 )
             },
             2 => {
-                // Triangle
+                // Star-like shape
                 let points = format!(
-                    "{},{} {},{} {},{}",
+                    "{},{} {},{} {},{} {},{} {},{}",
                     x, y - size_half,
-                    x - size_half, y + size_half,
-                    x + size_half, y + size_half
+                    x + size_half/2, y - size_half/4,
+                    x + size_half, y,
+                    x + size_half/2, y + size_half/2,
+                    x, y + size_half
                 );
                 format!(
-                    "<polygon points=\"{}\" fill=\"{}\"/>",
-                    points, color
+                    "<polygon points=\"{}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"2\" transform=\"rotate({} {} {})\"/>",
+                    points, color1, color2, rotation, x, y
+                )
+            },
+            3 => {
+                // Cross
+                format!(
+                    "<g transform=\"rotate({} {} {})\"><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\"/><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\"/></g>",
+                    rotation, x, y,
+                    x - size/6, y - size_half, size/3, size, color1,
+                    x - size_half, y - size/6, size, size/3, color2
                 )
             },
             _ => {
-                // Diamond
-                let points = format!(
-                    "{},{} {},{} {},{} {},{}",
+                // Diamond with three colors
+                format!(
+                    "<path d=\"M {} {} L {} {} L {} {} L {} {} Z\" fill=\"{}\" stroke=\"{}\" stroke-width=\"3\" transform=\"rotate({} {} {})\"/>",
                     x, y - size_half,
                     x + size_half, y,
                     x, y + size_half,
-                    x - size_half, y
-                );
-                format!(
-                    "<polygon points=\"{}\" fill=\"{}\"/>",
-                    points, color
+                    x - size_half, y,
+                    color1, color2,
+                    rotation, x, y
                 )
             }
         }
