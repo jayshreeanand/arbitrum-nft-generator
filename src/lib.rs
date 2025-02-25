@@ -6,8 +6,7 @@ use stylus_sdk::{
     prelude::*,
 };
 use stylus_sdk::alloy_sol_types::sol;
-use std::fmt;
-use std::fmt::Write;
+use std::fmt::{self, Write};
 use stylus_sdk::storage::{StorageAddress, StorageU32};
 
 // Add static buffers for SVG and JSON data
@@ -28,10 +27,10 @@ pub struct Contract {
 
 #[public]
 impl Contract {
-    pub fn constructor(&mut self) {
+    #[payable]
+    fn constructor(&mut self) {
         self.token_counter.set(Uint::<32, 1>::from(0u32));
     }
-
     pub fn supports_interface(&self, interface: FixedBytes<4>) -> bool {
         let interface_slice_array: [u8; 4] = interface.as_slice().try_into().unwrap();
         let id = u32::from_be_bytes(interface_slice_array);
@@ -117,10 +116,10 @@ impl Contract {
         }
 
         impl Write for BufferWriter {
-            fn write_str(&mut self, s: &str) -> fmt::Result {
+            fn write_str(&mut self, s: &str) -> fmt::Result {  // Fixed fmt::Result
                 let bytes = s.as_bytes();
                 if self.pos + bytes.len() > self.buf.len() {
-                    return Err(fmt::Error);
+                    return Err(fmt::Error);  // Fixed fmt::Error
                 }
                 for &b in bytes {
                     self.buf[self.pos] = b;
@@ -137,17 +136,15 @@ impl Contract {
             // Calculate dimensions
             let width = 500;
             let height = 500;
-            let grid_size = 5;
+            let grid_size = 6; // Increased grid size
             let cell_size = width / grid_size;
 
-            // Write SVG header with a background
-            let background_color = Self::get_random_color(tx_hash_bytes, 0);
+            // Write SVG header with a white background
             let _ = write!(
                 svg_writer,
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><rect width=\"100%\" height=\"100%\" fill=\"{bg}\"/>",
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><rect width=\"100%\" height=\"100%\" fill=\"#ffffff\"/>",
                 w = width,
-                h = height,
-                bg = background_color
+                h = height
             );
 
             // Generate random shapes based on transaction hash
@@ -166,16 +163,16 @@ impl Contract {
                 }
             }
 
-            // Add connecting lines
-            for i in 0..10 {
+            // Add connecting lines with gradients
+            for i in 0..15 { // Increased number of lines
                 let x1 = tx_hash_bytes[i % tx_hash_bytes.len()] as usize % width;
                 let y1 = tx_hash_bytes[(i + 1) % tx_hash_bytes.len()] as usize % height;
                 let x2 = tx_hash_bytes[(i + 2) % tx_hash_bytes.len()] as usize % width;
                 let y2 = tx_hash_bytes[(i + 3) % tx_hash_bytes.len()] as usize % height;
-                let line_color = Self::get_random_color(tx_hash_bytes, i);
+                let line_color = Self::get_random_color(tx_hash_bytes, i + grid_size * grid_size);
                 let _ = write!(
                     svg_writer,
-                    "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"{}\" stroke-width=\"2\" opacity=\"0.5\"/>",
+                    "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"{}\" stroke-width=\"2\" opacity=\"0.4\"/>",
                     x1, y1, x2, y2, line_color
                 );
             }
@@ -194,9 +191,9 @@ impl Contract {
 
             let _ = write!(
                 json_writer,
-                "{{\"name\":\"Random Art #{}\",\"description\":\"A unique piece of generative art created from transaction {}\",\"image\":\"{}\"}}",
+                "{{\"name\":\"Random Art #{}\",\"description\":\"A unique piece of generative art created from block {}\",\"image\":\"{}\"}}",
                 token_id,
-                hex::encode(tx_hash_bytes),
+                block_num,
                 svg_uri
             );
 
@@ -212,32 +209,50 @@ impl Contract {
 
 impl Contract {
     fn get_random_color(seed: &[u8], index: usize) -> String {
-        let byte = seed[index % seed.len()];
-        format!("#{:02x}{:02x}{:02x}", 
-            byte.wrapping_mul(7),
-            byte.wrapping_mul(13),
-            byte.wrapping_mul(17)
-        )
+        let r = seed[(index * 3) % seed.len()];
+        let g = seed[(index * 3 + 1) % seed.len()];
+        let b = seed[(index * 3 + 2) % seed.len()];
+        format!("#{:02x}{:02x}{:02x}", r, g, b)
     }
 
     fn get_random_shape(seed: &[u8], index: usize, x: usize, y: usize, size: usize) -> String {
-        let shape_type = seed[index % seed.len()] % 3;
+        let shape_type = seed[index % seed.len()] % 4;
+        let size_half = size / 2;
         let size_third = size / 3;
+        let color = Self::get_random_color(seed, index);
+        
         match shape_type {
             0 => format!(
-                "<circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{}\" opacity=\"0.7\"/>",
-                x, y, size_third, Self::get_random_color(seed, index + 1)
+                "<circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{}\" opacity=\"0.8\"/>",
+                x, y, size_third, color
             ),
             1 => format!(
-                "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\" opacity=\"0.7\"/>",
-                x - size_third, y - size_third, size/2, size/2, Self::get_random_color(seed, index + 2)
+                "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\" opacity=\"0.8\" transform=\"rotate({} {} {})\"/>",
+                x - size_third, 
+                y - size_third, 
+                size_half, 
+                size_half, 
+                color,
+                (seed[index % seed.len()] as u32) % 360, // Integer rotation
+                x,
+                y
             ),
-            _ => format!(
-                "<polygon points=\"{},{} {},{} {},{}\" fill=\"{}\" opacity=\"0.7\"/>",
+            2 => format!(
+                "<polygon points=\"{},{} {},{} {},{}\" fill=\"{}\" opacity=\"0.8\" transform=\"rotate({} {} {})\"/>",
                 x, y - size_third,
                 x - size_third, y + size_third,
                 x + size_third, y + size_third,
-                Self::get_random_color(seed, index + 3)
+                color,
+                (seed[(index + 1) % seed.len()] as u32) % 360, // Integer rotation
+                x,
+                y
+            ),
+            _ => format!(
+                "<path d=\"M {} {} L {} {} L {} {}\" stroke=\"{}\" fill=\"none\" stroke-width=\"3\" opacity=\"0.8\"/>",
+                x - size_half, y,
+                x, y - size_half,
+                x + size_half, y,
+                color
             ),
         }
     }
