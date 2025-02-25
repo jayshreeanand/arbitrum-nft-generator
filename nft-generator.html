@@ -1,48 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Geometric Art NFT Generator - Arbitrum Sepolia</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Space Grotesk', sans-serif;
-            background: linear-gradient(135deg, #f6f8fc 0%, #e9edf5 100%);
-            min-height: 100vh;
-        }
-        .glass-effect {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-        }
-        .nft-container {
-            transition: transform 0.3s ease;
-        }
-        .nft-container:hover {
-            transform: translateY(-5px);
-        }
-        .input-style {
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(99, 102, 241, 0.2);
-            transition: all 0.3s ease;
-        }
-        .input-style:focus {
-            border-color: rgba(99, 102, 241, 0.5);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-        .button-style {
-            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-            transition: all 0.3s ease;
-        }
-        .button-style:hover:not(:disabled) {
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Geometric Art NFT Generator - Arbitrum Sepolia</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <style>
+            body {
+                font-family: 'Space Grotesk', sans-serif;
+                background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+                min-height: 100vh;
+            }
+            .glass-effect {
+                background: rgba(255, 255, 255, 0.8);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(34, 197, 94, 0.3);
+                box-shadow: 0 8px 32px 0 rgba(22, 163, 74, 0.07);
+            }
+            .nft-container {
+                transition: transform 0.3s ease;
+            }
+            .nft-container:hover {
+                transform: translateY(-5px);
+            }
+            .input-style {
+                background: rgba(255, 255, 255, 0.9);
+                border: 1px solid rgba(34, 197, 94, 0.2);
+                transition: all 0.3s ease;
+            }
+            .input-style:focus {
+                border-color: rgba(34, 197, 94, 0.5);
+                box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+            }
+            .button-style {
+                background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+                transition: all 0.3s ease;
+            }
+            .button-style:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+            box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2);
         }
         .button-style:disabled {
             opacity: 0.5;
@@ -54,7 +54,7 @@
     <div id="root"></div>
     
     <script>
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useCallback } = React;
 
         // Helper function to preload image
         const preloadImage = (src) => {
@@ -66,123 +66,155 @@
             });
         };
 
+        // Minimal ERC721 ABI for tokenURI function plus our event
+        const minABI = [
+            {
+                "inputs": [{"internalType": "uint256","name": "tokenId","type": "uint256"}],
+                "name": "tokenURI",
+                "outputs": [{"internalType": "string","name": "","type": "string"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "anonymous": false,
+                "inputs": [],
+                "name": "TrainingCompleted",
+                "type": "event"
+            }
+        ];
+
         const NFTViewer = () => {
             const [address, setAddress] = useState('');
             const [tokenId, setTokenId] = useState('');
             const [nftImage, setNftImage] = useState('');
             const [error, setError] = useState('');
             const [loading, setLoading] = useState(false);
+            const [lastTraining, setLastTraining] = useState(null);
 
-            // Fetch NFT data
-            const fetchNFT = async () => {
-                if (!address || !tokenId) {
-                    setError('Please enter both contract address and token ID');
-                    return;
-                }
-
+            const fetchNFT = useCallback(async () => {
+                if (loading) return; // Prevent concurrent fetches
+                if (!address || !tokenId) return; // Ensure we have required inputs
+                
                 setLoading(true);
                 setError('');
-
+                
                 try {
-                    const provider = new ethers.providers.JsonRpcProvider('https://sepolia-rollup.arbitrum.io/rpc');
-                    const contract = new ethers.Contract(
-                        address,
-                        ['function tokenURI(uint256) view returns (string)'],
-                        provider
-                    );
-
-                    const tokenURI = await contract.tokenURI(tokenId);
+                    // Convert tokenId to a valid BigNumber string
+                    const tokenIdBN = ethers.BigNumber.from(tokenId).toString();
                     
-                    if (tokenURI.startsWith('data:application/json;base64,')) {
-                        const jsonData = atob(tokenURI.split(',')[1]);
-                        const metadata = JSON.parse(jsonData);
-                        await preloadImage(metadata.image);
-                        setNftImage(metadata.image);
-                    } else {
-                        const response = await fetch(tokenURI);
-                        const metadata = await response.json();
-                        await preloadImage(metadata.image);
-                        setNftImage(metadata.image);
+                    // Connect to Arbitrum Sepolia
+                    const provider = new ethers.providers.JsonRpcProvider('http://localhost:3000');
+                    // const provider = new ethers.providers.JsonRpcProvider('http://localhost:8547');
+                    provider.getNetwork().then((network) => {
+    console.log('Connected to network:', network);
+}).catch((error) => {
+    console.error('Error connecting to network:', error);
+});
+                    const contract = new ethers.Contract(address, minABI, provider);
+                    // Fetch token URI
+                    const uri = await contract.tokenURI(tokenIdBN);
+                    
+                    // Handle data URI
+                    if (uri.startsWith('data:application/json;base64,')) {
+                        const json = atob(uri.split(',')[1]);
+                        const metadata = JSON.parse(json);
+                        if (metadata.image) {
+                            await preloadImage(metadata.image);
+                            setNftImage(metadata.image);
+                        }
                     }
                 } catch (err) {
                     setError('Error fetching NFT: ' + err.message);
                 } finally {
                     setLoading(false);
                 }
-            };
+            }, [address, tokenId, loading]);
 
-            return React.createElement('div', { className: 'min-h-screen py-12 px-4 sm:px-6 lg:px-8' }, [
-                React.createElement('div', { className: 'max-w-4xl mx-auto', key: 'container' }, [
-                    React.createElement('div', { className: 'text-center mb-12', key: 'header' }, [
-                        React.createElement('h1', { 
-                            className: 'text-4xl font-bold text-gray-900 mb-4',
-                            key: 'title'
-                        }, 'Geometric Art NFT Generator'),
-                        React.createElement('p', {
-                            className: 'text-lg text-gray-600',
-                            key: 'subtitle'
-                        }, 'Create unique, on-chain generative art NFTs on Arbitrum Sepolia')
+            useEffect(() => {
+                if (!address) return;
+                const provider = new ethers.providers.JsonRpcProvider('http://localhost:3000');
+                // const provider = new ethers.providers.JsonRpcProvider('http://localhost:8547');
+                const contract = new ethers.Contract(address, minABI, provider);
+
+                const handleTrainingCompleted = async () => {
+                    console.log('Training completed');
+                    setLastTraining({
+                        timestamp: new Date().toLocaleTimeString()
+                    });
+                    // Add slight delay to ensure contract state is updated
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    // Only fetch if we have both address and tokenId
+                    if (address && tokenId) {
+                        await fetchNFT();
+                    }
+                };
+
+                contract.on('TrainingCompleted', handleTrainingCompleted);
+
+                return () => {
+                    contract.removeListener('TrainingCompleted', handleTrainingCompleted);
+                };
+            }, [address, tokenId, fetchNFT]);
+
+            return React.createElement('div', { className: 'p-4 max-w-2xl mx-auto' }, [
+                React.createElement('h1', { className: 'text-2xl font-bold mb-4', key: 'title' }, 
+                    'Random Geometric Art NFT Generator'
+                ),
+                React.createElement('div', { className: 'space-y-4', key: 'container' }, [
+                    React.createElement('div', { key: 'address-container' }, [
+                        React.createElement('label', { 
+                            className: 'block text-sm font-medium mb-1',
+                            key: 'address-label'
+                        }, 'Contract Address:'),
+                        React.createElement('input', {
+                            type: 'text',
+                            value: address,
+                            onChange: (e) => setAddress(e.target.value),
+                            className: 'w-full p-2 border rounded',
+                            placeholder: '0x...',
+                            key: 'address-input'
+                        })
                     ]),
-
-                    React.createElement('div', { 
-                        className: 'glass-effect rounded-2xl p-8 mb-8',
-                        key: 'form-container'
-                    }, [
-                        React.createElement('div', { className: 'grid grid-cols-1 gap-6', key: 'form-grid' }, [
-                            React.createElement('div', { key: 'address-container' }, [
-                                React.createElement('label', {
-                                    className: 'block text-sm font-medium text-gray-700 mb-2',
-                                    key: 'address-label'
-                                }, 'Contract Address'),
-                                React.createElement('input', {
-                                    type: 'text',
-                                    value: address,
-                                    onChange: (e) => setAddress(e.target.value),
-                                    className: 'input-style w-full px-4 py-3 rounded-lg',
-                                    placeholder: '0x...',
-                                    key: 'address-input'
-                                })
-                            ]),
-                            React.createElement('div', { key: 'tokenId-container' }, [
-                                React.createElement('label', {
-                                    className: 'block text-sm font-medium text-gray-700 mb-2',
-                                    key: 'tokenId-label'
-                                }, 'Token ID'),
-                                React.createElement('input', {
-                                    type: 'text',
-                                    value: tokenId,
-                                    onChange: (e) => setTokenId(e.target.value),
-                                    className: 'input-style w-full px-4 py-3 rounded-lg',
-                                    placeholder: '0',
-                                    key: 'tokenId-input'
-                                })
-                            ]),
-                            React.createElement('button', {
-                                onClick: fetchNFT,
-                                disabled: loading,
-                                className: `button-style w-full py-3 px-4 rounded-lg text-white font-medium`,
-                                key: 'fetch-button'
-                            }, loading ? 'Generating...' : 'Generate NFT')
-                        ])
+                    React.createElement('div', { key: 'tokenId-container' }, [
+                        React.createElement('label', {
+                            className: 'block text-sm font-medium mb-1',
+                            key: 'tokenId-label'
+                        }, 'Token ID:'),
+                        React.createElement('input', {
+                            type: 'text',
+                            value: tokenId,
+                            onChange: (e) => setTokenId(e.target.value),
+                            className: 'w-full p-2 border rounded',
+                            placeholder: '0',
+                            key: 'tokenId-input'
+                        })
                     ]),
-
+                    React.createElement('button', {
+                        onClick: fetchNFT,
+                        disabled: loading,
+                        className: 'w-full bg-green-500 text-white p-2 rounded hover:bg-green-600 disabled:bg-gray-300',
+                        key: 'fetch-button'
+                    }, loading ? 'Loading...' : 'View NFT'),
+                    lastTraining && React.createElement('div', {
+                        className: 'mt-2 p-2 bg-green-100 rounded',
+                        key: 'training-info'
+                    }, `Training completed at ${lastTraining.timestamp}`),
                     error && React.createElement('div', {
-                        className: 'mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700',
+                        className: 'text-red-500 mt-2',
                         key: 'error'
                     }, error),
-
                     nftImage && React.createElement('div', {
-                        className: 'nft-container glass-effect rounded-2xl p-6',
+                        className: 'mt-4 relative',
                         key: 'image-container'
                     }, [
                         React.createElement('img', {
                             src: nftImage,
-                            alt: 'Generated NFT',
-                            className: 'w-full rounded-lg shadow-lg',
+                            alt: 'NFT',
+                            className: 'max-w-full border rounded',
                             key: 'nft-image'
                         }),
                         loading && React.createElement('div', {
-                            className: 'absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center rounded-lg',
+                            className: 'absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center',
                             key: 'loading-overlay'
                         }, 'Updating...')
                     ])
