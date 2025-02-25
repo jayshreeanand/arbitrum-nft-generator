@@ -136,18 +136,33 @@ impl Contract {
             // Calculate dimensions
             let width = 500;
             let height = 500;
-            let grid_size = 6; // Increased grid size
+            let grid_size = 6;
             let cell_size = width / grid_size;
+            let padding = cell_size / 6; // Add some padding between shapes
 
-            // Write SVG header with a white background
+            // Write SVG header with a light gray background
             let _ = write!(
                 svg_writer,
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><rect width=\"100%\" height=\"100%\" fill=\"#ffffff\"/>",
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><rect width=\"100%\" height=\"100%\" fill=\"#f0f0f0\"/>",
                 w = width,
                 h = height
             );
 
-            // Generate random shapes based on transaction hash
+            // Generate connecting lines first (as background)
+            for i in 0..20 { // Increased number of lines
+                let x1 = tx_hash_bytes[i % tx_hash_bytes.len()] as usize % width;
+                let y1 = tx_hash_bytes[(i + 1) % tx_hash_bytes.len()] as usize % height;
+                let x2 = tx_hash_bytes[(i + 2) % tx_hash_bytes.len()] as usize % width;
+                let y2 = tx_hash_bytes[(i + 3) % tx_hash_bytes.len()] as usize % height;
+                let line_color = Self::get_random_color(tx_hash_bytes, i + grid_size * grid_size);
+                let _ = write!(
+                    svg_writer,
+                    "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"{}\" stroke-width=\"1\" opacity=\"0.3\"/>",
+                    x1, y1, x2, y2, line_color
+                );
+            }
+
+            // Generate shapes with padding
             for i in 0..grid_size {
                 for j in 0..grid_size {
                     let x = j * cell_size + cell_size / 2;
@@ -157,26 +172,11 @@ impl Contract {
                         i * grid_size + j,
                         x,
                         y,
-                        cell_size
+                        cell_size - padding * 2
                     );
                     let _ = write!(svg_writer, "{}", shape);
                 }
             }
-
-            // Add connecting lines with gradients
-            for i in 0..15 { // Increased number of lines
-                let x1 = tx_hash_bytes[i % tx_hash_bytes.len()] as usize % width;
-                let y1 = tx_hash_bytes[(i + 1) % tx_hash_bytes.len()] as usize % height;
-                let x2 = tx_hash_bytes[(i + 2) % tx_hash_bytes.len()] as usize % width;
-                let y2 = tx_hash_bytes[(i + 3) % tx_hash_bytes.len()] as usize % height;
-                let line_color = Self::get_random_color(tx_hash_bytes, i + grid_size * grid_size);
-                let _ = write!(
-                    svg_writer,
-                    "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"{}\" stroke-width=\"2\" opacity=\"0.4\"/>",
-                    x1, y1, x2, y2, line_color
-                );
-            }
-
             let _ = write!(svg_writer, "</svg>");
 
             // Get the final SVG string and base64 encode it
@@ -209,9 +209,14 @@ impl Contract {
 
 impl Contract {
     fn get_random_color(seed: &[u8], index: usize) -> String {
-        let r = seed[(index * 3) % seed.len()];
-        let g = seed[(index * 3 + 1) % seed.len()];
-        let b = seed[(index * 3 + 2) % seed.len()];
+        // Ensure we use different bytes for each color component
+        let r = seed[index % seed.len()];
+        let g = seed[(index + 1) % seed.len()];
+        let b = seed[(index + 2) % seed.len()];
+        // Add some minimum brightness to avoid all-black colors
+        let r = ((r as u16 + 50) % 256) as u8;
+        let g = ((g as u16 + 50) % 256) as u8;
+        let b = ((b as u16 + 50) % 256) as u8;
         format!("#{:02x}{:02x}{:02x}", r, g, b)
     }
 
@@ -220,6 +225,7 @@ impl Contract {
         let size_half = size / 2;
         let size_third = size / 3;
         let color = Self::get_random_color(seed, index);
+        let rotation = (seed[(index + 3) % seed.len()] as u32) % 360;
         
         match shape_type {
             0 => format!(
@@ -233,7 +239,7 @@ impl Contract {
                 size_half, 
                 size_half, 
                 color,
-                (seed[index % seed.len()] as u32) % 360, // Integer rotation
+                rotation,
                 x,
                 y
             ),
@@ -243,17 +249,20 @@ impl Contract {
                 x - size_third, y + size_third,
                 x + size_third, y + size_third,
                 color,
-                (seed[(index + 1) % seed.len()] as u32) % 360, // Integer rotation
+                rotation,
                 x,
                 y
             ),
-            _ => format!(
-                "<path d=\"M {} {} L {} {} L {} {}\" stroke=\"{}\" fill=\"none\" stroke-width=\"3\" opacity=\"0.8\"/>",
-                x - size_half, y,
-                x, y - size_half,
-                x + size_half, y,
-                color
-            ),
+            _ => {
+                let stroke_width = (seed[(index + 4) % seed.len()] % 5 + 2) as usize;
+                format!(
+                    "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"{}\" stroke-width=\"{}\" opacity=\"0.8\"/>",
+                    x - size_half, y,
+                    x + size_half, y,
+                    color,
+                    stroke_width
+                )
+            }
         }
     }
 
