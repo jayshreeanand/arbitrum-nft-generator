@@ -6,6 +6,14 @@ A generative art NFT project built on Arbitrum using Rust and Stylus. This proje
 
 This project demonstrates the power of Stylus by implementing a fully on-chain NFT collection where each token's artwork is generated programmatically and stored entirely on the blockchain. The artwork consists of geometric shapes and connecting lines arranged in a grid pattern, with colors and rotations determined by block data.
 
+Minted NFTs as viewed on metamask
+
+<img width="380" alt="Screenshot 2025-02-26 at 10 40 59 AM" src="https://github.com/user-attachments/assets/d5d897f7-f551-4c4c-a69d-63c42bfe232c" />
+
+### Image generation page
+<img width="500" alt="Screenshot 2025-02-26 at 10 40 27 AM" src="https://github.com/user-attachments/assets/8d38c50b-2a79-49b4-bc95-1d3f7a26e740" />
+
+
 ## Features
 
 - **Fully On-Chain Art**: All NFT artwork is generated and stored on-chain as SVG
@@ -34,6 +42,27 @@ This project demonstrates the power of Stylus by implementing a fully on-chain N
 - Shape rotation and positioning
 - Connecting lines with opacity effects
 - White background for better visibility
+
+- 
+### Screenshots
+
+Interacting with contract on Remix IDE
+<img width="1665" alt="Screenshot 2025-02-26 at 4 01 46 AM" src="https://github.com/user-attachments/assets/eb78c316-6b51-4da0-8f58-3773229561f4" />
+
+Deployed Contract
+<img width="278" alt="Screenshot 2025-02-26 at 3 30 39 AM" src="https://github.com/user-attachments/assets/4aca22f4-27d4-488b-814d-2ad64e1a5a9a" />
+
+Transaction Request
+<img width="357" alt="Screenshot 2025-02-26 at 3 30 24 AM" src="https://github.com/user-attachments/assets/4e74f008-46ce-4968-90c7-033d2292c42f" />
+
+Successful NFT minting
+<img width="1142" alt="Screenshot 2025-02-26 at 3 12 53 AM" src="https://github.com/user-attachments/assets/bb6dfeef-f77d-4e72-81f0-214e9be6c2e5" />
+
+Stylus deploy on Nitro dev node
+<img width="1339" alt="Screenshot 2025-02-26 at 2 58 53 AM" src="https://github.com/user-attachments/assets/5d322591-39c3-4f5c-af6b-3a100b99eeff" />
+
+
+
 
 ## Visual Elements
 
