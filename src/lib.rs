@@ -4,12 +4,16 @@ extern crate alloc;
 use stylus_sdk::{
     alloy_primitives::{Address, FixedBytes, U256, Uint},
     prelude::*,
-    msg,
+    evm,
 };
-use stylus_sdk::{alloy_sol_types::sol, block};
+use stylus_sdk::alloy_sol_types::sol;
 use std::fmt;
 use std::fmt::Write;
 use stylus_sdk::storage::{StorageAddress, StorageU32};
+
+// Add static buffers for SVG and JSON data
+static mut SVG_BUFFER: [u8; 16384] = [0; 16384];  // 16KB buffer for SVG
+static mut JSON_BUFFER: [u8; 8192] = [0; 8192];   // 8KB buffer for JSON
 
 sol! {
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
@@ -44,15 +48,15 @@ impl Contract {
         self.token_counter.set(self.token_counter.get() + Uint::<32, 1>::from(1u32));
         
         // Emit events
-        msg::log(Transfer {
+        evm::log(Transfer {
             from: Address::ZERO,
             to,
             tokenId: token_id,
         });
         
-        msg::log(NFTMinted {
+        evm::log(NFTMinted {
             tokenId: token_id,
-            txHash: msg::tx_hash(),
+            txHash: evm::tx_hash(),
         });
 
         token_id
@@ -89,12 +93,9 @@ impl Contract {
 
     #[selector(name = "tokenURI")]
     pub fn token_uri(&self, token_id: U256) -> String {
-        // ... existing code ...
         // Get transaction details for randomization
-        let tx_hash = msg::tx_hash();
+        let tx_hash = evm::tx_hash();
         let tx_hash_bytes = tx_hash.as_bytes();
-
-       
 
         struct BufferWriter {
             buf: &'static mut [u8],
