@@ -138,7 +138,6 @@ impl Contract {
             let height = 500;
             let grid_size = 6;
             let cell_size = width / grid_size;
-            let padding = cell_size / 6;
 
             // Write SVG header with definitions for gradients
             let _ = write!(
@@ -176,27 +175,12 @@ impl Contract {
                 );
             }
 
-            // Generate connecting lines with gradients
-            for i in 0..15 {
-                let x1 = tx_hash_bytes[i % tx_hash_bytes.len()] as usize % width;
-                let y1 = tx_hash_bytes[(i + 1) % tx_hash_bytes.len()] as usize % height;
-                let x2 = tx_hash_bytes[(i + 2) % tx_hash_bytes.len()] as usize % width;
-                let y2 = tx_hash_bytes[(i + 3) % tx_hash_bytes.len()] as usize % height;
-                let grad_index = i % 5;
-                let stroke_width = 1 + (tx_hash_bytes[i] as usize % 3);
-                let _ = write!(
-                    svg_writer,
-                    "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"url(#grad{})\" stroke-width=\"{}\" opacity=\"0.3\"/>",
-                    x1, y1, x2, y2, grad_index, stroke_width
-                );
-            }
-
             // Generate shapes in a grid
             for i in 0..grid_size {
                 for j in 0..grid_size {
                     let x = (j * cell_size) + (cell_size / 2);
                     let y = (i * cell_size) + (cell_size / 2);
-                    let shape_size = cell_size * 4 / 5; // Make shapes slightly smaller
+                    let shape_size = cell_size * 4 / 5;
                     let shape = Self::get_random_shape(
                         tx_hash_bytes,
                         i * grid_size + j,
@@ -239,17 +223,15 @@ impl Contract {
 
 impl Contract {
     fn get_random_color(seed: &[u8], index: usize) -> String {
+        // Use different combinations of the seed bytes for more variation
         let r = seed[(index * 3) % seed.len()];
         let g = seed[(index * 5 + 1) % seed.len()];
         let b = seed[(index * 7 + 2) % seed.len()];
         
-        // Ensure colors are vibrant by ensuring at least one component is high
-        let max_component = r.max(g).max(b);
-        let scale = 255.0 / max_component.max(1) as f32;
-        
-        let r = ((r as u16 * 7 + 100) % 256) as u8;
-        let g = ((g as u16 * 5 + 100) % 256) as u8;
-        let b = ((b as u16 * 3 + 100) % 256) as u8;
+        // Ensure colors are vibrant by adding minimum values
+        let r = ((r as u16 * 7 + 85) % 256) as u8;
+        let g = ((g as u16 * 5 + 85) % 256) as u8;
+        let b = ((b as u16 * 3 + 85) % 256) as u8;
         
         format!("#{:02x}{:02x}{:02x}", r, g, b)
     }
@@ -257,7 +239,7 @@ impl Contract {
     fn get_random_shape(seed: &[u8], index: usize, x: usize, y: usize, size: usize) -> String {
         let shape_seed = (seed[index % seed.len()] as u16 * 
                          seed[(index + 7) % seed.len()] as u16) % 256;
-        let shape_type = shape_seed % 6; // Increased number of shape types
+        let shape_type = shape_seed % 6;
         
         let size_half = size / 2;
         let grad_index = index % 5;
@@ -287,7 +269,7 @@ impl Contract {
                     (50 + (seed[(index * 4) % seed.len()] as usize % 50)) / 100;
                 let height = size * 
                     (50 + (seed[(index * 5) % seed.len()] as usize % 50)) / 100;
-                let rx = width / 10; // rounded corners
+                let rx = width / 10;
                 format!(
                     "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"{}\" fill=\"{}\" opacity=\"0.8\" transform=\"rotate({} {} {})\"/>",
                     x - width/2, y - height/2, width, height, rx, fill, rotation, x, y
@@ -351,37 +333,6 @@ impl Contract {
                 )
             }
         }
-    }
-
-    fn generate_star_points(cx: usize, cy: usize, outer_radius: usize, inner_radius: usize, points: usize) -> String {
-        let mut result = String::new();
-        for i in 0..points*2 {
-            let radius = if i % 2 == 0 { outer_radius } else { inner_radius };
-            let angle = i as f64 * std::f64::consts::PI / points as f64;
-            let x = cx + (radius as f64 * angle.cos()) as usize;
-            let y = cy + (radius as f64 * angle.sin()) as usize;
-            if i == 0 {
-                result.push_str(&format!("{},{}", x, y));
-            } else {
-                result.push_str(&format!(" {},{}", x, y));
-            }
-        }
-        result
-    }
-
-    fn generate_polygon_points(cx: usize, cy: usize, radius: usize, sides: usize) -> String {
-        let mut result = String::new();
-        for i in 0..sides {
-            let angle = i as f64 * 2.0 * std::f64::consts::PI / sides as f64;
-            let x = cx + (radius as f64 * angle.cos()) as usize;
-            let y = cy + (radius as f64 * angle.sin()) as usize;
-            if i == 0 {
-                result.push_str(&format!("{},{}", x, y));
-            } else {
-                result.push_str(&format!(" {},{}", x, y));
-            }
-        }
-        result
     }
 
     fn base64_encode(input: &[u8]) -> String {
