@@ -1,3 +1,107 @@
+# Random Art NFT Generator - Stylus Edition
+
+A generative art NFT project built on Arbitrum using Rust and Stylus. This project creates unique, on-chain SVG art for each minted NFT, with randomization based on block numbers.
+
+## Overview
+
+This project demonstrates the power of Stylus by implementing a fully on-chain NFT collection where each token's artwork is generated programmatically and stored entirely on the blockchain. The artwork consists of geometric shapes and connecting lines arranged in a grid pattern, with colors and rotations determined by block data.
+
+## Features
+
+- **Fully On-Chain Art**: All NFT artwork is generated and stored on-chain as SVG
+- **Dynamic Generation**: Each NFT is unique, with artwork based on block numbers
+- **ERC-721 Compatible**: Implements core ERC-721 functionality
+- **Geometric Art**: Generates art using various shapes:
+  - Circles
+  - Rotated Rectangles
+  - Triangles
+  - Connected Lines
+
+## Technical Details
+
+### Smart Contract Features
+
+- ERC-721 implementation
+- On-chain SVG generation
+- Base64 encoding for metadata and images
+- Efficient storage using static buffers
+- Block number-based randomization
+
+### Art Generation
+
+- 6x6 grid of geometric shapes
+- Random color generation for each shape
+- Shape rotation and positioning
+- Connecting lines with opacity effects
+- White background for better visibility
+
+## Getting Started
+
+### Prerequisites
+
+- Rust toolchain
+- Cargo Stylus
+- An Arbitrum testnet account with test ETH
+
+### Installation
+
+bash
+Clone the repository
+git clone [your-repo-url]
+cd [your-repo-name]
+Install dependencies
+cargo install cargo-stylus
+Build the project
+cargo stylus check
+
+### Deployment
+
+Deploy to Arbitrum testnet
+cargo stylus deploy
+
+javascript
+// Using ethers.js or web3.js
+const tx = await contract.mint(recipientAddress);
+
+### Viewing NFTs
+
+The NFTs can be viewed on any NFT marketplace that supports Arbitrum and SVG rendering.
+
+## Technical Architecture
+
+### Storage
+
+- Uses static buffers for efficient SVG and JSON generation
+- SVG Buffer: 16KB
+- JSON Buffer: 8KB
+
+### Randomization
+
+- Uses block numbers for deterministic randomization
+- Converts block numbers to pseudo-random bytes
+- Ensures reproducible results while maintaining uniqueness
+
+### Art Generation Process
+
+1. Creates a 6x6 grid
+2. Generates random shapes for each grid cell
+3. Adds connecting lines between random points
+4. Applies random colors and rotations
+5. Encodes as base64 SVG
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Built with Stylus SDK
+- Deployed on Arbitrum
+
 ![Image](./header.png)
 
 # Stylus Hello World
@@ -23,7 +127,7 @@ contract Counter {
 
 To set up more minimal example that still uses the Stylus SDK, use `cargo stylus new --minimal <YOUR_PROJECT_NAME>` under [OffchainLabs/cargo-stylus](https://github.com/OffchainLabs/cargo-stylus).
 
-## Quick Start 
+## Quick Start
 
 Install [Rust](https://www.rust-lang.org/tools/install), and then install the Stylus CLI tool with Cargo
 
@@ -117,7 +221,6 @@ Estimated gas for deployment: 1874876
 ```
 
 The above only estimates gas for the deployment tx by default. To estimate gas for activation, first deploy your program using `--mode=deploy-only`, and then run `cargo stylus deploy` with the `--estimate-gas` flag, `--mode=activate-only`, and specify `--activate-program-address`.
-
 
 Here's how to deploy:
 
